@@ -51,14 +51,48 @@ function toDateString(date) {
   return `${year}-${month}-${day}`;
 }
 
+// changing currency
+async function convertToCad(amount, currency, expenseDate) {
+  if (currency === "CAD") {
+    return {
+      amountCad: amount,
+      exchangeRate: 1,
+      exchangeRateDate: null,
+    };
+  }
+
+  const url =
+    `https://api.frankfurter.dev/v2/rate/${currency}/CAD` +
+    `?date=${expenseDate}`;
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("Exchange rate unavailable");
+  }
+
+  const { rate, date } = await response.json();
+
+  if (!Number.isFinite(rate) || rate <= 0 || typeof date !== "string") {
+    throw new Error("Invalid exchange rate");
+  }
+
+  return {
+    amountCad: Number((amount * rate).toFixed(2)),
+    exchangeRate: rate,
+    exchangeRateDate: date,
+  };
+}
+
 function AddExpenseContent({ onSave }) {
   // Temporary values matching the mockup.
-  const [itemName, setItemName] = useState("Coffee");
-  const [store, setStore] = useState("Starbucks");
-  const [category, setCategory] = useState("Food & Drinks");
-  const [amount, setAmount] = useState("4.75");
-  const [currency, setCurrency] = useState("CAD");
-  const [date, setDate] = useState(new Date(2026, 9, 9));
+  const [itemName, setItemName] = useState("");
+  const [store, setStore] = useState("");
+  const [category, setCategory] = useState("");
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState("");
+  // const [date, setDate] = useState(new Date(2026, 9, 9));
+  const [date, setDate] = useState(null);
   const [note, setNote] = useState("");
   const [receiptUri, setReceiptUri] = useState(null);
 
@@ -136,43 +170,37 @@ function AddExpenseContent({ onSave }) {
     Keyboard.dismiss();
 
     const normalizedAmount = amount.trim().replace(",", ".");
+    const numericAmount = Number(normalizedAmount);
 
     if (!itemName.trim()) {
       Alert.alert("Missing item name", "Please enter an item name.");
       return;
     }
 
+    if (!category) {
+      Alert.alert("Missing category", "Please select a category.");
+      return;
+    }
+
     if (
       !/^\d+(?:\.\d{1,2})?$/.test(normalizedAmount) ||
-      !Number.isFinite(Number(normalizedAmount)) ||
-      Number(normalizedAmount) <= 0
+      !Number.isFinite(numericAmount) ||
+      numericAmount <= 0
     ) {
       Alert.alert(
         "Invalid amount",
-        "Please enter an amount greater than 0, with up to two decimal places.",
+        "Enter a positive amount with up to two decimal places.",
       );
       return;
     }
 
-    const expense = {
-      name: itemName.trim(),
-      store: store.trim(),
-      category,
-      amount: Number(normalizedAmount),
-      currency,
-      date: toDateString(date),
-      note: note.trim(),
-      receiptUri,
-    };
+    if (!currencies.includes(currency)) {
+      Alert.alert("Missing currency", "Please select a currency.");
+      return;
+    }
 
-    // UI demo until a real storage function is supplied.
-    if (typeof onSave !== "function") {
-      Alert.alert(
-        "Form checked",
-        `${expense.name} · ${expense.amount.toFixed(2)} ${
-          expense.currency
-        }\n\nDemo only: this expense has not been saved.`,
-      );
+    if (!date) {
+      Alert.alert("Missing date", "Please select a date.");
       return;
     }
 
@@ -180,12 +208,50 @@ function AddExpenseContent({ onSave }) {
     setSaving(true);
 
     try {
+      const expenseDate = toDateString(date);
+
+      let conversion;
+      try {
+        conversion = await convertToCad(numericAmount, currency, expenseDate);
+      } catch {
+        Alert.alert(
+          "Exchange rate unavailable",
+          "Check your connection or try another date. Your entries are still here.",
+        );
+        return;
+      }
+
+      const expense = {
+        name: itemName.trim(),
+        store: store.trim(),
+        category,
+        amount: numericAmount,
+        currency,
+        date: expenseDate,
+        note: note.trim(),
+        receiptUri,
+        ...conversion,
+      };
+
+      if (typeof onSave !== "function") {
+        const original = `${expense.amount.toFixed(2)} ${expense.currency}`;
+        const converted = `${expense.amountCad.toFixed(2)} CAD`;
+
+        Alert.alert(
+          "Form checked",
+          `${expense.name}\n${
+            currency === "CAD" ? converted : `${original} ≈ ${converted}`
+          }\n\nDemo only. This expense has not been saved.`,
+        );
+        return;
+      }
+
       await onSave(expense);
       Alert.alert("Saved", "Your expense has been saved.");
     } catch {
       Alert.alert(
         "Unable to save",
-        "Please try again. Your form values have been kept.",
+        "Please try again. Your entries are still here.",
       );
     } finally {
       savingRef.current = false;
@@ -271,7 +337,7 @@ function AddExpenseContent({ onSave }) {
                 style={styles.input}
                 value={itemName}
                 onChangeText={setItemName}
-                placeholder="Coffee"
+                placeholder=""
                 placeholderTextColor={muted}
                 accessibilityLabel="Item name"
                 maxLength={80}
@@ -284,7 +350,7 @@ function AddExpenseContent({ onSave }) {
                 style={styles.input}
                 value={store}
                 onChangeText={setStore}
-                placeholder="Starbucks"
+                placeholder=""
                 placeholderTextColor={muted}
                 accessibilityLabel="Where to buy"
                 maxLength={100}
@@ -370,10 +436,16 @@ function AddExpenseContent({ onSave }) {
             }}
             style={styles.dateRow}
             accessibilityRole="button"
-            accessibilityLabel={`Select date, ${formatDate(date)}`}
+            // accessibilityLabel={`Select date, ${formatDate(date)}`}
+            accessibilityLabel={
+              date ? `Select date, ${formatDate(date)}` : "Select date"
+            }
           >
             <View style={[styles.input, styles.dateValue]}>
-              <Text style={styles.inputText}>{formatDate(date)}</Text>
+              {/* <Text style={styles.inputText}>{formatDate(date)}</Text> */}
+              <Text style={styles.inputText}>
+                {date ? formatDate(date) : "Select date"}
+              </Text>
             </View>
 
             <View style={styles.calendarButton}>
@@ -388,7 +460,8 @@ function AddExpenseContent({ onSave }) {
           {showDatePicker && (
             <View style={styles.datePickerContainer}>
               <DateTimePicker
-                value={date}
+                // value={date}
+                value={date ?? new Date()}
                 mode="date"
                 display={Platform.OS === "ios" ? "spinner" : "default"}
                 onChange={handleDateChange}
@@ -399,7 +472,11 @@ function AddExpenseContent({ onSave }) {
 
               {Platform.OS === "ios" && (
                 <Pressable
-                  onPress={() => setShowDatePicker(false)}
+                  // onPress={() => setShowDatePicker(false)}
+                  onPress={() => {
+                    setDate((selectedDate) => selectedDate ?? new Date());
+                    setShowDatePicker(false);
+                  }}
                   style={styles.doneButton}
                   accessibilityRole="button"
                 >
