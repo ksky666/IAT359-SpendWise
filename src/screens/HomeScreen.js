@@ -73,7 +73,7 @@ function CircularProgress({ percentage }) {
   );
 }
 
-function HomeContent({ navigation }) {
+function HomeContent({ navigation, expenses = [] }) {
   // Temporary data for UI development
   const monthlyBudget = 500;
   const totalSpent = 360;
@@ -83,32 +83,7 @@ function HomeContent({ navigation }) {
 
   const progress = Math.max(0, Math.min(spendingPercentage, 100));
 
-  const recentExpenses = [
-    {
-      id: "1",
-      name: "Clothing",
-      amount: 204,
-      date: "Oct 10, 2026",
-      originalAmount: "£120",
-      icon: "bag-handle-outline",
-    },
-    {
-      id: "2",
-      name: "Travel",
-      amount: 109,
-      date: "Oct 8, 2026",
-      originalAmount: "$80 USD",
-      icon: "airplane-outline",
-    },
-    {
-      id: "3",
-      name: "Food & Drinks",
-      amount: 45,
-      date: "Oct 2, 2026",
-      originalAmount: null,
-      icon: "restaurant-outline",
-    },
-  ];
+  const recentExpenses = expenses.slice(0, 3);
 
   // Route names are placeholders: match these to your navigator.
   function openScreen(route) {
@@ -209,30 +184,63 @@ function HomeContent({ navigation }) {
           </Pressable>
         </View>
 
-        {recentExpenses.map((expense) => (
-          <View key={expense.id} style={styles.expenseCard}>
-            <View style={styles.expenseIcon}>
-              <Ionicons name={expense.icon} size={29} color={colors.primary} />
-            </View>
+        {/* placeholder button for temporary preview */}
+        {__DEV__ && (
+          <Pressable
+            style={styles.expenseCard}
+            onPress={() =>
+              navigation.navigate("ExpenseDetails", { preview: true })
+            }
+            accessibilityRole="button"
+          >
+            <Text style={styles.expenseName}>Preview Expense Details</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+          </Pressable>
+        )}
 
-            <View style={styles.expenseDetails}>
-              <Text style={styles.expenseName}>{expense.name}</Text>
-              <Text style={styles.expenseDate}>{expense.date}</Text>
-            </View>
+        {recentExpenses.length === 0 ? (
+          <Text style={styles.expenseDate}>No expenses yet.</Text>
+        ) : (
+          recentExpenses.map((expense) => (
+            <Pressable
+              key={expense.id}
+              style={styles.expenseCard}
+              onPress={() =>
+                navigation.navigate("ExpenseDetails", {
+                  expenseId: expense.id,
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`View expense: ${expense.name}`}
+            >
+              <View style={styles.expenseIcon}>
+                <Ionicons
+                  name="receipt-outline"
+                  size={26}
+                  color={colors.primary}
+                />
+              </View>
 
-            <View style={styles.expenseAmounts}>
-              <Text style={styles.expenseAmount}>
-                {expense.originalAmount ?? `$${expense.amount.toFixed(0)} CAD`}
-              </Text>
+              <View style={styles.expenseDetails}>
+                <Text style={styles.expenseName}>{expense.name}</Text>
+                <Text style={styles.expenseDate}>{expense.date}</Text>
+              </View>
 
-              {expense.originalAmount && (
-                <Text style={styles.convertedAmount}>
-                  ≈${expense.amount.toFixed(0)} CAD
+              <View style={styles.expenseAmounts}>
+                <Text style={styles.expenseAmount}>
+                  {expense.amount.toFixed(2)} {expense.currency}
                 </Text>
-              )}
-            </View>
-          </View>
-        ))}
+
+                {expense.currency !== "CAD" &&
+                  Number.isFinite(expense.amountCad) && (
+                    <Text style={styles.convertedAmount}>
+                      ≈ {expense.amountCad.toFixed(2)} CAD
+                    </Text>
+                  )}
+              </View>
+            </Pressable>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
