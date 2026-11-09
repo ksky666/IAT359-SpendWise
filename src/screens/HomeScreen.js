@@ -198,30 +198,49 @@ function HomeContent({ navigation, expenses = [] }) {
           </Pressable>
         )}
 
-        {recentExpenses.map((expense) => (
-          <View key={expense.id} style={styles.expenseCard}>
-            <View style={styles.expenseIcon}>
-              <Ionicons name={expense.icon} size={29} color={colors.primary} />
-            </View>
+        {recentExpenses.length === 0 ? (
+          <Text style={styles.expenseDate}>No expenses yet.</Text>
+        ) : (
+          recentExpenses.map((expense) => (
+            <Pressable
+              key={expense.id}
+              style={styles.expenseCard}
+              onPress={() =>
+                navigation.navigate("ExpenseDetails", {
+                  expenseId: expense.id,
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`View expense: ${expense.name}`}
+            >
+              <View style={styles.expenseIcon}>
+                <Ionicons
+                  name="receipt-outline"
+                  size={26}
+                  color={colors.primary}
+                />
+              </View>
 
-            <View style={styles.expenseDetails}>
-              <Text style={styles.expenseName}>{expense.name}</Text>
-              <Text style={styles.expenseDate}>{expense.date}</Text>
-            </View>
+              <View style={styles.expenseDetails}>
+                <Text style={styles.expenseName}>{expense.name}</Text>
+                <Text style={styles.expenseDate}>{expense.date}</Text>
+              </View>
 
-            <View style={styles.expenseAmounts}>
-              <Text style={styles.expenseAmount}>
-                {expense.originalAmount ?? `$${expense.amount.toFixed(0)} CAD`}
-              </Text>
-
-              {expense.originalAmount && (
-                <Text style={styles.convertedAmount}>
-                  ≈${expense.amount.toFixed(0)} CAD
+              <View style={styles.expenseAmounts}>
+                <Text style={styles.expenseAmount}>
+                  {expense.amount.toFixed(2)} {expense.currency}
                 </Text>
-              )}
-            </View>
-          </View>
-        ))}
+
+                {expense.currency !== "CAD" &&
+                  Number.isFinite(expense.amountCad) && (
+                    <Text style={styles.convertedAmount}>
+                      ≈ {expense.amountCad.toFixed(2)} CAD
+                    </Text>
+                  )}
+              </View>
+            </Pressable>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
