@@ -73,7 +73,7 @@ function CircularProgress({ percentage }) {
   );
 }
 
-function HomeContent({ navigation }) {
+function HomeContent({ navigation, expenses = [] }) {
   // Temporary data for UI development
   const monthlyBudget = 500;
   const totalSpent = 360;
@@ -83,32 +83,7 @@ function HomeContent({ navigation }) {
 
   const progress = Math.max(0, Math.min(spendingPercentage, 100));
 
-  const recentExpenses = [
-    {
-      id: "1",
-      name: "Clothing",
-      amount: 204,
-      date: "Oct 10, 2026",
-      originalAmount: "£120",
-      icon: "bag-handle-outline",
-    },
-    {
-      id: "2",
-      name: "Travel",
-      amount: 109,
-      date: "Oct 8, 2026",
-      originalAmount: "$80 USD",
-      icon: "airplane-outline",
-    },
-    {
-      id: "3",
-      name: "Food & Drinks",
-      amount: 45,
-      date: "Oct 2, 2026",
-      originalAmount: null,
-      icon: "restaurant-outline",
-    },
-  ];
+  const recentExpenses = expenses.slice(0, 3);
 
   // Route names are placeholders: match these to your navigator.
   function openScreen(route) {
@@ -208,6 +183,20 @@ function HomeContent({ navigation }) {
             <Text style={styles.seeAll}>See All</Text>
           </Pressable>
         </View>
+
+        {/* placeholder button for temporary preview */}
+        {__DEV__ && (
+          <Pressable
+            style={styles.expenseCard}
+            onPress={() =>
+              navigation.navigate("ExpenseDetails", { preview: true })
+            }
+            accessibilityRole="button"
+          >
+            <Text style={styles.expenseName}>Preview Expense Details</Text>
+            <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+          </Pressable>
+        )}
 
         {recentExpenses.map((expense) => (
           <View key={expense.id} style={styles.expenseCard}>
