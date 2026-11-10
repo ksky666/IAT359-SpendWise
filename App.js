@@ -9,6 +9,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./src/firebaseConfig";
 
+import { Alert } from "react-native";
+
+import { createExpense, subscribeToExpenses } from "./src/expenseService";
+
 import HomeScreen from "./src/screens/HomeScreen";
 import AddExpenseScreen from "./src/screens/AddExpenseScreen";
 import StatisticsScreen from "./src/screens/StatisticsScreen";
@@ -54,35 +58,44 @@ function AuthStackScreen() {
 }
 
 export default function App() {
-  const [expenses, setExpenses] = useState([]);
-
-  // New: Firebase authentication state
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [expenseFeed, setExpenseFeed] = useState(null);
 
-  // New: Listen for login/logout changes
+  const userId = user?.uid ?? null;
+  const expenses = expenseFeed?.userId === userId ? expenseFeed.items : [];
+
+  // Track login and logout.
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    return onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setAuthLoading(false);
     });
-
-    return unsubscribe;
   }, []);
 
-  function saveExpense(expense) {
-    const record = {
-      ...expense,
-      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    };
+  // Load expenses for the signed-in account.
+  useEffect(() => {
+    setExpenseFeed(null);
 
-    setExpenses((current) => [record, ...current]);
-  }
+    if (!userId) return;
 
-  function deleteExpense(expenseId) {
-    setExpenses((current) =>
-      current.filter((expense) => expense.id !== expenseId),
+    return subscribeToExpenses(
+      userId,
+      (items) => {
+        setExpenseFeed({ userId, items });
+      },
+      (error) => {
+        console.warn("Unable to load expenses:", error.code);
+        Alert.alert(
+          "Unable to load expenses",
+          "Please check your connection and try again.",
+        );
+      },
     );
+  }, [userId]);
+
+  async function saveExpense(expense) {
+    await createExpense(expense);
   }
 
   // New: Wait for Firebase to check login status
@@ -123,9 +136,7 @@ export default function App() {
           })}
         >
           <Tab.Screen name="Home">
-            {() => (
-              <HomeStackScreen expenses={expenses} onDelete={deleteExpense} />
-            )}
+            {() => <HomeStackScreen expenses={expenses} />}
           </Tab.Screen>
 
           <Tab.Screen name="Add">
