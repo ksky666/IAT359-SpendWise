@@ -1,19 +1,27 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
+
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./src/firebaseConfig";
+
 import HomeScreen from "./src/screens/HomeScreen";
 import AddExpenseScreen from "./src/screens/AddExpenseScreen";
 import StatisticsScreen from "./src/screens/StatisticsScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
-
 import ExpenseDetailsScreen from "./src/screens/ExpenseDetailsScreen";
 
-const Tab = createBottomTabNavigator();
+// New authentication screens
+import LoginScreen from "./src/screens/LoginScreen";
+import SignUpScreen from "./src/screens/SignUpScreen";
 
+const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
+const AuthStack = createNativeStackNavigator();
 
 function HomeStackScreen({ expenses, onDelete }) {
   return (
@@ -35,8 +43,32 @@ function HomeStackScreen({ expenses, onDelete }) {
   );
 }
 
+// New: Login and Sign Up navigation
+function AuthStackScreen() {
+  return (
+    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+      <AuthStack.Screen name="Login" component={LoginScreen} />
+      <AuthStack.Screen name="SignUp" component={SignUpScreen} />
+    </AuthStack.Navigator>
+  );
+}
+
 export default function App() {
   const [expenses, setExpenses] = useState([]);
+
+  // New: Firebase authentication state
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // New: Listen for login/logout changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
 
   function saveExpense(expense) {
     const record = {
@@ -53,40 +85,59 @@ export default function App() {
     );
   }
 
+  // New: Wait for Firebase to check login status
+  if (authLoading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <ActivityIndicator size="large" color="#333333" />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarActiveTintColor: "#333333",
-          tabBarInactiveTintColor: "#999999",
-          tabBarIcon: ({ color, size }) => {
-            const icons = {
-              Home: "home-outline",
-              Add: "add-circle-outline",
-              Stats: "bar-chart-outline",
-              Profile: "person-outline",
-            };
+      {user ? (
+        <Tab.Navigator
+          screenOptions={({ route }) => ({
+            headerShown: false,
+            tabBarActiveTintColor: "#333333",
+            tabBarInactiveTintColor: "#999999",
+            tabBarIcon: ({ color, size }) => {
+              const icons = {
+                Home: "home-outline",
+                Add: "add-circle-outline",
+                Stats: "bar-chart-outline",
+                Profile: "person-outline",
+              };
 
-            return (
-              <Ionicons name={icons[route.name]} size={size} color={color} />
-            );
-          },
-        })}
-      >
-        <Tab.Screen name="Home">
-          {() => (
-            <HomeStackScreen expenses={expenses} onDelete={deleteExpense} />
-          )}
-        </Tab.Screen>
+              return (
+                <Ionicons name={icons[route.name]} size={size} color={color} />
+              );
+            },
+          })}
+        >
+          <Tab.Screen name="Home">
+            {() => (
+              <HomeStackScreen expenses={expenses} onDelete={deleteExpense} />
+            )}
+          </Tab.Screen>
 
-        <Tab.Screen name="Add">
-          {(props) => <AddExpenseScreen {...props} onSave={saveExpense} />}
-        </Tab.Screen>
+          <Tab.Screen name="Add">
+            {(props) => <AddExpenseScreen {...props} onSave={saveExpense} />}
+          </Tab.Screen>
 
-        <Tab.Screen name="Stats" component={StatisticsScreen} />
-        <Tab.Screen name="Profile" component={ProfileScreen} />
-      </Tab.Navigator>
+          <Tab.Screen name="Stats" component={StatisticsScreen} />
+          <Tab.Screen name="Profile" component={ProfileScreen} />
+        </Tab.Navigator>
+      ) : (
+        <AuthStackScreen />
+      )}
     </NavigationContainer>
   );
 }
