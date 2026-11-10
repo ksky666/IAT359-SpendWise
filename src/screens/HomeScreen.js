@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Alert,
   Pressable,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Modal,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
@@ -18,6 +19,21 @@ const ui = {
   expenseBackground: "#EAF0DE",
   ringBackground: "#CEDDB5",
 };
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 function CircularProgress({ percentage }) {
   const size = 132;
@@ -74,18 +90,43 @@ function CircularProgress({ percentage }) {
 }
 
 function HomeContent({ navigation, expenses = [] }) {
-  // Temporary data for UI development
-  const monthlyBudget = 500;
-  const totalSpent = 360;
-  const remaining = monthlyBudget - totalSpent;
-  const spendingPercentage =
-    monthlyBudget > 0 ? (totalSpent / monthlyBudget) * 100 : 0;
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const today = new Date();
 
+    return {
+      year: today.getFullYear(),
+      month: today.getMonth() + 1,
+    };
+  });
+
+  const [pickerYear, setPickerYear] = useState(null);
+
+  const monthLabel = `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`;
+
+  const monthKey = `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, "0")}`;
+
+  const monthlyExpenses = expenses.filter(
+    (expense) =>
+      typeof expense.date === "string" && expense.date.slice(0, 7) === monthKey,
+  );
+
+  const recentExpenses = monthlyExpenses.slice(0, 3);
+  const monthlyBudget = 500;
+
+  const totalSpent =
+    monthlyExpenses.reduce((total, expense) => {
+      const amountCad =
+        expense.currency === "CAD" ? expense.amount : expense.amountCad;
+
+      return Number.isFinite(amountCad)
+        ? total + Math.round(amountCad * 100)
+        : total;
+    }, 0) / 100;
+
+  const remaining = monthlyBudget - totalSpent;
+  const spendingPercentage = (totalSpent / monthlyBudget) * 100;
   const progress = Math.max(0, Math.min(spendingPercentage, 100));
 
-  const recentExpenses = expenses.slice(0, 3);
-
-  // Route names are placeholders: match these to your navigator.
   function openScreen(route) {
     if (navigation?.navigate) {
       navigation.navigate(route);
@@ -99,7 +140,12 @@ function HomeContent({ navigation, expenses = [] }) {
   }
 
   function openMonthPicker() {
-    Alert.alert("Select month", "This is a placeholder for your month picker.");
+    setPickerYear(selectedMonth.year);
+  }
+
+  function selectMonth(month) {
+    setSelectedMonth({ year: pickerYear, month });
+    setPickerYear(null);
   }
 
   const budgetMessage =
@@ -123,10 +169,10 @@ function HomeContent({ navigation, expenses = [] }) {
             onPress={openMonthPicker}
             style={styles.monthButton}
             accessibilityRole="button"
-            accessibilityLabel="Select month, October 2026"
+            accessibilityLabel={`Select month, ${monthLabel}`}
             hitSlop={8}
           >
-            <Text style={styles.month}>October 2026</Text>
+            <Text style={styles.month}>{monthLabel}</Text>
             <Ionicons name="chevron-down" size={19} color={colors.primary} />
           </Pressable>
         </View>
@@ -242,6 +288,84 @@ function HomeContent({ navigation, expenses = [] }) {
           ))
         )}
       </ScrollView>
+
+      <Modal
+        visible={pickerYear !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPickerYear(null)}
+      >
+        <View style={styles.monthPickerOverlay}>
+          <View style={styles.monthPickerCard} accessibilityViewIsModal>
+            <Text style={styles.monthPickerTitle}>Select month</Text>
+
+            <View style={styles.monthPickerYearRow}>
+              <Pressable
+                style={styles.monthPickerArrow}
+                onPress={() => setPickerYear((year) => year - 1)}
+                accessibilityRole="button"
+                accessibilityLabel="Previous year"
+              >
+                <Ionicons
+                  name="chevron-back"
+                  size={22}
+                  color={colors.primary}
+                />
+              </Pressable>
+
+              <Text style={styles.monthPickerTitle}>{pickerYear}</Text>
+
+              <Pressable
+                style={styles.monthPickerArrow}
+                onPress={() => setPickerYear((year) => year + 1)}
+                accessibilityRole="button"
+                accessibilityLabel="Next year"
+              >
+                <Ionicons
+                  name="chevron-forward"
+                  size={22}
+                  color={colors.primary}
+                />
+              </Pressable>
+            </View>
+
+            <View style={styles.monthPickerGrid}>
+              {MONTH_NAMES.map((name, index) => {
+                const month = index + 1;
+                const selected =
+                  selectedMonth.year === pickerYear &&
+                  selectedMonth.month === month;
+
+                return (
+                  <Pressable
+                    key={name}
+                    onPress={() => selectMonth(month)}
+                    style={[
+                      styles.monthPickerOption,
+                      selected && styles.monthPickerSelected,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${name} ${pickerYear}`}
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={styles.monthPickerText}>
+                      {name.slice(0, 3)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Pressable
+              style={styles.monthPickerCancel}
+              onPress={() => setPickerYear(null)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.monthPickerText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -447,5 +571,65 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 4,
     textAlign: "right",
+  },
+  monthPickerOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+  },
+  monthPickerCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    padding: 20,
+  },
+  monthPickerTitle: {
+    color: colors.primary,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  monthPickerYearRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginVertical: 12,
+  },
+  monthPickerArrow: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  monthPickerGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 8,
+  },
+  monthPickerOption: {
+    width: "23%",
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EAF0DE",
+    borderRadius: 10,
+  },
+  monthPickerSelected: {
+    backgroundColor: colors.sage,
+    borderWidth: 2,
+    borderColor: colors.secondary,
+  },
+  monthPickerText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  monthPickerCancel: {
+    alignSelf: "flex-end",
+    padding: 12,
+    marginTop: 8,
   },
 });
