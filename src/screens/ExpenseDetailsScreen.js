@@ -103,35 +103,35 @@ export default function ExpenseDetailsScreen({
             <View style={styles.nameRow}>
               <Text style={styles.name}>{expense.name}</Text>
 
-              {/* <Pressable
-                onPress={confirmDelete}
-                style={styles.deleteButton}
-                accessibilityRole="button"
-                accessibilityLabel="Delete expense"
-              >
-                <Ionicons
-                  name="trash-outline"
-                  size={17}
-                  color={colors.primary}
-                />
-                <Text style={styles.deleteText}>Delete</Text>
-              </Pressable> */}
+              {expense.id && (
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <Pressable
+                    style={styles.deleteButton}
+                    accessibilityRole="button"
+                    onPress={() =>
+                      navigation.navigate("EditExpense", {
+                        expenseId: expense.id,
+                      })
+                    }
+                  >
+                    <Text style={styles.deleteText}>Edit</Text>
+                  </Pressable>
 
-              {/* placeholder button for temporary preview */}
-              {!isPreview && (
-                <Pressable
-                  onPress={confirmDelete}
-                  style={styles.deleteButton}
-                  accessibilityRole="button"
-                  accessibilityLabel="Delete expense"
-                >
-                  <Ionicons
-                    name="trash-outline"
-                    size={17}
-                    color={colors.primary}
-                  />
-                  <Text style={styles.deleteText}>Delete</Text>
-                </Pressable>
+                  {typeof onDelete === "function" && (
+                    <Pressable
+                      style={styles.deleteButton}
+                      accessibilityRole="button"
+                      onPress={confirmDelete}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={17}
+                        color={colors.primary}
+                      />
+                      <Text style={styles.deleteText}>Delete</Text>
+                    </Pressable>
+                  )}
+                </View>
               )}
             </View>
 

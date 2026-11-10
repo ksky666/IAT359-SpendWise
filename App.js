@@ -11,7 +11,12 @@ import { auth } from "./src/firebaseConfig";
 
 import { Alert } from "react-native";
 
-import { createExpense, subscribeToExpenses } from "./src/expenseService";
+import {
+  createExpense,
+  deleteExpense,
+  subscribeToExpenses,
+  updateExpense,
+} from "./src/expenseService";
 
 import HomeScreen from "./src/screens/HomeScreen";
 import AddExpenseScreen from "./src/screens/AddExpenseScreen";
@@ -27,7 +32,27 @@ const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
 
-function HomeStackScreen({ expenses, onDelete }) {
+// function HomeStackScreen({ expenses, onDelete }) {
+//   return (
+//     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
+//       <HomeStack.Screen name="HomeOverview">
+//         {(props) => <HomeScreen {...props} expenses={expenses} />}
+//       </HomeStack.Screen>
+
+//       <HomeStack.Screen name="ExpenseDetails">
+//         {(props) => (
+//           <ExpenseDetailsScreen
+//             {...props}
+//             expenses={expenses}
+//             onDelete={onDelete}
+//           />
+//         )}
+//       </HomeStack.Screen>
+//     </HomeStack.Navigator>
+//   );
+// }
+
+function HomeStackScreen({ expenses }) {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="HomeOverview">
@@ -39,9 +64,38 @@ function HomeStackScreen({ expenses, onDelete }) {
           <ExpenseDetailsScreen
             {...props}
             expenses={expenses}
-            onDelete={onDelete}
+            onDelete={deleteExpense}
           />
         )}
+      </HomeStack.Screen>
+
+      <HomeStack.Screen name="EditExpense">
+        {({ navigation, route }) => {
+          const expense = expenses.find(
+            (item) => item.id === route.params?.expenseId,
+          );
+
+          if (!expense) {
+            return (
+              <View style={{ flex: 1, justifyContent: "center", padding: 24 }}>
+                <Text>This expense is no longer available.</Text>
+                <Button title="Go back" onPress={() => navigation.goBack()} />
+              </View>
+            );
+          }
+
+          return (
+            <AddExpenseScreen
+              key={expense.id}
+              navigation={navigation}
+              initialExpense={expense}
+              onSave={async (changes) => {
+                await updateExpense(expense.id, changes);
+                if (navigation.isFocused()) navigation.goBack();
+              }}
+            />
+          );
+        }}
       </HomeStack.Screen>
     </HomeStack.Navigator>
   );

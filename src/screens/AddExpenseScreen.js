@@ -84,16 +84,23 @@ async function convertToCad(amount, currency, expenseDate) {
   };
 }
 
-function AddExpenseContent({ onSave }) {
-  // Temporary values matching the mockup.
-  const [itemName, setItemName] = useState("");
-  const [store, setStore] = useState("");
-  const [category, setCategory] = useState("");
-  const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("");
-  // const [date, setDate] = useState(new Date(2026, 9, 9));
-  const [date, setDate] = useState(null);
-  const [note, setNote] = useState("");
+function AddExpenseContent({ onSave, initialExpense }) {
+  const isEditing = Boolean(initialExpense);
+
+  const [itemName, setItemName] = useState(initialExpense?.name ?? "");
+  const [store, setStore] = useState(initialExpense?.store ?? "");
+  const [category, setCategory] = useState(initialExpense?.category ?? "");
+  const [amount, setAmount] = useState(
+    initialExpense?.amount != null ? String(initialExpense.amount) : "",
+  );
+  const [currency, setCurrency] = useState(initialExpense?.currency ?? "");
+  const [date, setDate] = useState(() => {
+    if (!initialExpense?.date) return null;
+
+    const [year, month, day] = initialExpense.date.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  });
+  const [note, setNote] = useState(initialExpense?.note ?? "");
   const [receiptUri, setReceiptUri] = useState(null);
 
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
@@ -271,7 +278,9 @@ function AddExpenseContent({ onSave }) {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          <Text style={styles.title}>Add Expense</Text>
+          <Text style={styles.title}>
+            {isEditing ? "Edit Expense" : "Add Expense"}
+          </Text>
 
           {/* Receipt upload and preview */}
           <View style={styles.receiptRow}>
