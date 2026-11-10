@@ -10,6 +10,7 @@ import {
 
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebaseConfig";
+import { colors } from "../theme";
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState("");
@@ -26,8 +27,6 @@ export default function LoginScreen({ navigation }) {
 
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
-
-      Alert.alert("Success", "Logged in successfully!");
     } catch (error) {
       Alert.alert("Login failed", error.message);
     } finally {
@@ -42,8 +41,10 @@ export default function LoginScreen({ navigation }) {
       <TextInput
         style={styles.input}
         placeholder="Email"
+        placeholderTextColor="#7B8B7F"
         autoCapitalize="none"
         keyboardType="email-address"
+        autoComplete="email"
         value={email}
         onChangeText={setEmail}
       />
@@ -51,13 +52,20 @@ export default function LoginScreen({ navigation }) {
       <TextInput
         style={styles.input}
         placeholder="Password"
+        placeholderTextColor="#7B8B7F"
         secureTextEntry
         value={password}
         onChangeText={setPassword}
       />
 
-      <Pressable style={styles.button} onPress={handleLogin} disabled={loading}>
-        <Text>{loading ? "Logging in..." : "Log In"}</Text>
+      <Pressable
+        style={[styles.button, loading && styles.disabledButton]}
+        onPress={handleLogin}
+        disabled={loading}
+      >
+        <Text style={styles.buttonText}>
+          {loading ? "Logging in..." : "Log In"}
+        </Text>
       </Pressable>
 
       <Pressable onPress={() => navigation.navigate("SignUp")}>
@@ -71,29 +79,45 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
-    padding: 24,
+    paddingHorizontal: 28,
+    backgroundColor: colors.background,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 24,
+    fontSize: 32,
+    fontWeight: "700",
+    color: colors.primary,
+    marginBottom: 48,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#CCCCCC",
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: colors.sage,
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    height: 56,
+    fontSize: 16,
+    color: colors.primary,
     marginBottom: 16,
   },
   button: {
-    padding: 16,
-    backgroundColor: "#EEEEEE",
-    borderRadius: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    height: 56,
+    justifyContent: "center",
     alignItems: "center",
+    marginTop: 12,
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: colors.white,
+    fontSize: 17,
+    fontWeight: "600",
   },
   link: {
-    marginTop: 20,
+    marginTop: 24,
     textAlign: "center",
-    textDecorationLine: "underline",
+    color: colors.secondary,
+    fontSize: 15,
+    fontWeight: "500",
   },
 });
