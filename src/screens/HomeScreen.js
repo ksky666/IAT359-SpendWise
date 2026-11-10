@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -8,6 +8,8 @@ import {
   View,
   Modal,
 } from "react-native";
+import { doc, onSnapshot } from "firebase/firestore";
+import { auth, db } from "../firebaseConfig";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -111,7 +113,32 @@ function HomeContent({ navigation, expenses = [] }) {
   );
 
   const recentExpenses = monthlyExpenses.slice(0, 3);
-  const monthlyBudget = 500;
+
+  const [monthlyBudget, setMonthlyBudget] = useState(0);
+
+  useEffect(() => {
+    const userId = auth.currentUser?.uid;
+
+    if (!userId) return;
+
+    const userRef = doc(db, "users", userId);
+
+    const unsubscribe = onSnapshot(
+      userRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+
+          setMonthlyBudget(Number(data.monthlyBudget) || 0);
+        }
+      },
+      (error) => {
+        console.error("Failed to load monthly budget:", error);
+      },
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   const totalSpent =
     monthlyExpenses.reduce((total, expense) => {
@@ -124,7 +151,10 @@ function HomeContent({ navigation, expenses = [] }) {
     }, 0) / 100;
 
   const remaining = monthlyBudget - totalSpent;
-  const spendingPercentage = (totalSpent / monthlyBudget) * 100;
+
+  const spendingPercentage =
+    monthlyBudget > 0 ? (totalSpent / monthlyBudget) * 100 : 0;
+
   const progress = Math.max(0, Math.min(spendingPercentage, 100));
 
   function openScreen(route) {
