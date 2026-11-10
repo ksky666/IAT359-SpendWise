@@ -32,26 +32,6 @@ const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
 
-// function HomeStackScreen({ expenses, onDelete }) {
-//   return (
-//     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
-//       <HomeStack.Screen name="HomeOverview">
-//         {(props) => <HomeScreen {...props} expenses={expenses} />}
-//       </HomeStack.Screen>
-
-//       <HomeStack.Screen name="ExpenseDetails">
-//         {(props) => (
-//           <ExpenseDetailsScreen
-//             {...props}
-//             expenses={expenses}
-//             onDelete={onDelete}
-//           />
-//         )}
-//       </HomeStack.Screen>
-//     </HomeStack.Navigator>
-//   );
-// }
-
 function HomeStackScreen({ expenses }) {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
