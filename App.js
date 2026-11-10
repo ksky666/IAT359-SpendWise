@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, Alert, Text, Button } from "react-native";
 
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { NavigationContainer } from "@react-navigation/native";
@@ -7,9 +7,8 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "./src/firebaseConfig";
-
-import { Alert } from "react-native";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "./src/firebaseConfig";
 
 import {
   createExpense,
@@ -18,20 +17,27 @@ import {
   updateExpense,
 } from "./src/expenseService";
 
+import {
+  savePreferencesLocally,
+  savePreferencesToFirestore,
+} from "./src/preferencesService";
+
 import HomeScreen from "./src/screens/HomeScreen";
 import AddExpenseScreen from "./src/screens/AddExpenseScreen";
 import StatisticsScreen from "./src/screens/StatisticsScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import ExpenseDetailsScreen from "./src/screens/ExpenseDetailsScreen";
 
-// New authentication screens
 import LoginScreen from "./src/screens/LoginScreen";
 import SignUpScreen from "./src/screens/SignUpScreen";
+import WelcomeScreen from "./src/screens/WelcomeScreen";
+import PreferencesSetupScreen from "./src/screens/PreferencesSetupScreen";
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
 
+// Home navigation, including expense details and editing.
 function HomeStackScreen({ expenses }) {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
@@ -57,7 +63,13 @@ function HomeStackScreen({ expenses }) {
 
           if (!expense) {
             return (
-              <View style={{ flex: 1, justifyContent: "center", padding: 24 }}>
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: "center",
+                  padding: 24,
+                }}
+              >
                 <Text>This expense is no longer available.</Text>
                 <Button title="Go back" onPress={() => navigation.goBack()} />
               </View>
@@ -71,7 +83,10 @@ function HomeStackScreen({ expenses }) {
               initialExpense={expense}
               onSave={async (changes) => {
                 await updateExpense(expense.id, changes);
-                if (navigation.isFocused()) navigation.goBack();
+
+                if (navigation.isFocused()) {
+                  navigation.goBack();
+                }
               }}
             />
           );
@@ -81,11 +96,17 @@ function HomeStackScreen({ expenses }) {
   );
 }
 
-// New: Login and Sign Up navigation
+// Authentication navigation.
 function AuthStackScreen() {
   return (
-    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+    <AuthStack.Navigator
+      initialRouteName="Welcome"
+      screenOptions={{ headerShown: false }}
+    >
+      <AuthStack.Screen name="Welcome" component={WelcomeScreen} />
+
       <AuthStack.Screen name="Login" component={LoginScreen} />
+
       <AuthStack.Screen name="SignUp" component={SignUpScreen} />
     </AuthStack.Navigator>
   );
@@ -94,20 +115,70 @@ function AuthStackScreen() {
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+
+  // Preferences setup state.
+  const [setupCompleted, setSetupCompleted] = useState(false);
+  const [savingPreferences, setSavingPreferences] = useState(false);
+
+  // Firestore expense subscription state.
   const [expenseFeed, setExpenseFeed] = useState(null);
 
   const userId = user?.uid ?? null;
+
   const expenses = expenseFeed?.userId === userId ? expenseFeed.items : [];
 
-  // Track login and logout.
+  // Listen for authentication changes and check preferences.
   useEffect(() => {
-    return onAuthStateChanged(auth, (currentUser) => {
+    let checkId = 0;
+
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      const currentCheck = ++checkId;
+
       setUser(currentUser);
-      setAuthLoading(false);
+      setAuthLoading(true);
+      setSetupCompleted(false);
+
+      if (!currentUser) {
+        setAuthLoading(false);
+        return;
+      }
+
+      try {
+        const userRef = doc(db, "users", currentUser.uid);
+        const snapshot = await getDoc(userRef);
+
+        if (currentCheck !== checkId) return;
+
+        const completed =
+          snapshot.exists() && snapshot.data().setupCompleted === true;
+
+        setSetupCompleted(completed);
+      } catch (error) {
+        if (currentCheck !== checkId) return;
+
+        console.error("Failed to check setup status:", error);
+
+        Alert.alert(
+          "Connection Error",
+          "Unable to load your account settings. Please try again.",
+        );
+
+        // Do not treat a failed request as incomplete setup.
+        return;
+      }
+
+      if (currentCheck === checkId) {
+        setAuthLoading(false);
+      }
     });
+
+    return () => {
+      checkId++;
+      unsubscribe();
+    };
   }, []);
 
-  // Load expenses for the signed-in account.
+  // Subscribe to the signed-in user's expenses.
   useEffect(() => {
     setExpenseFeed(null);
 
@@ -120,6 +191,7 @@ export default function App() {
       },
       (error) => {
         console.warn("Unable to load expenses:", error.code);
+
         Alert.alert(
           "Unable to load expenses",
           "Please check your connection and try again.",
@@ -128,11 +200,42 @@ export default function App() {
     );
   }, [userId]);
 
+  // Create an expense in Firestore.
   async function saveExpense(expense) {
     await createExpense(expense);
   }
 
-  // New: Wait for Firebase to check login status
+  // Complete initial preferences setup.
+  async function handlePreferencesComplete(preferences) {
+    if (!user?.uid || savingPreferences) return;
+
+    setSavingPreferences(true);
+
+    try {
+      // Firestore is the source of truth.
+      await savePreferencesToFirestore(user.uid, preferences);
+
+      // Local storage acts as a cache.
+      try {
+        await savePreferencesLocally(user.uid, preferences);
+      } catch (localError) {
+        console.warn("Failed to cache preferences locally:", localError);
+      }
+
+      setSetupCompleted(true);
+    } catch (error) {
+      console.error("Failed to save preferences:", error);
+
+      Alert.alert(
+        "Save Failed",
+        "Your preferences could not be saved. Please try again.",
+      );
+    } finally {
+      setSavingPreferences(false);
+    }
+  }
+
+  // Wait for authentication and preferences verification.
   if (authLoading) {
     return (
       <View
@@ -149,7 +252,11 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      {user ? (
+      {!user ? (
+        <AuthStackScreen />
+      ) : !setupCompleted ? (
+        <PreferencesSetupScreen onComplete={handlePreferencesComplete} />
+      ) : (
         <Tab.Navigator
           screenOptions={({ route }) => ({
             headerShown: false,
@@ -178,10 +285,9 @@ export default function App() {
           </Tab.Screen>
 
           <Tab.Screen name="Stats" component={StatisticsScreen} />
+
           <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
-      ) : (
-        <AuthStackScreen />
       )}
     </NavigationContainer>
   );
